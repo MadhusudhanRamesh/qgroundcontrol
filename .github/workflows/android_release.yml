@@ -1,4 +1,3 @@
-# The 32 and 64 bit version of these actions should be kept in sync
 name: Android 32/64-bit Release
 
 on:
@@ -8,8 +7,6 @@ on:
   pull_request:
     branches:
       - '*'
-
-
 defaults:
   run:
     shell: bash
@@ -123,7 +120,7 @@ jobs:
       - name: Create artifacts directory
         run: mkdir -p artifacts
 
-      - name: Create artifacts directory
+    - name: Create artifacts directory
         run: mkdir -p artifacts
 
       - name: Save artifact
@@ -132,6 +129,11 @@ jobs:
           name: ${{ matrix.ARTIFACT }}
           path: artifacts/${{ matrix.ARTIFACT }}
 
+      # (Any other steps you need)
+
+      - name: Use the saved artifact (example: list files)
+        run: |
+          ls -R artifacts
       # - name: Upload build to S3 Bucket
       #   if:                 github.event_name == 'push'
       #   working-directory:  ${{ runner.temp }}/shadow_build_dir/package
