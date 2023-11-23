@@ -131,7 +131,7 @@ jobs:
 
       # (Any other steps you need)
 
-      - name: Use the saved artifact (example: list files)
+      - name: Use the saved artifact
         run: |
           ls -R artifacts
       # - name: Upload build to S3 Bucket
