@@ -1,12 +1,16 @@
+    # branches-ignore:
+    #   - '*'
+# The 32 and 64 bit version of these actions should be kept in sync
 name: Android 32/64-bit Release
 
 on:
   push:
-    branches-ignore:
-      - '*'
+    branches:
+      - 'master'
   pull_request:
     branches:
-      - '*'
+    - '*'
+
 defaults:
   run:
     shell: bash
@@ -14,8 +18,7 @@ defaults:
 env:
   SOURCE_DIR:   ${{ github.workspace }}
   QT_VERSION:   5.15.2
-  # BUILD_TYPE:   ${{ fromJSON('["DailyBuild", "StableBuild"]')[ github.ref_type == 'tag' || contains(github.ref, 'Stable_' ) ] }}
-BUILD_TYPE: ${{ if (github.ref_type == 'tag' || contains(github.ref, 'Stable_')) then ('StableBuild') else ('DailyBuild') }}
+  BUILD_TYPE:   ${{ fromJSON('["DailyBuild", "StableBuild"]')[ github.ref_type == 'tag' || contains(github.ref, 'Stable_' ) ] }}
 
 jobs:
   build:
@@ -59,12 +62,10 @@ jobs:
           ndk-version: r21e
           add-to-path: false
 
-      - name: Remove Android SDKs to force usage of android-33 only
+      - name: Remove Android SDK android-33-ext
         run: |
             ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager --uninstall "platforms;android-33-ext5"
             ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager --uninstall "platforms;android-33-ext4"
-            ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager --uninstall "platforms;android-34"
-            ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager --uninstall "platforms;android-34-ext8"
 
       - name: Install ccache
         run:  sudo apt-get install ccache
@@ -118,32 +119,25 @@ jobs:
 
       - name: ccache post-run
         run:  ccache -s
-      - name: Create artifacts directory
-        run: mkdir -p artifacts
 
       - name: Save artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@master
         with:
           name: ${{ matrix.ARTIFACT }}
-          path: artifacts/${{ matrix.ARTIFACT }}
+          path: ${{ runner.temp }}/shadow_build_dir/package/${{ matrix.ARTIFACT }}
 
-      # (Any other steps you need)
+      - name: Upload build to S3 Bucket
+        if:                 github.event_name == 'push'
+        working-directory:  ${{ runner.temp }}/shadow_build_dir/package
+        run: |
+              aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+              aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+              aws s3 cp ${{ matrix.ARTIFACT }} s3://qgroundcontrol/builds/${{ github.ref_name }}/${{ matrix.ARTIFACT }} --region us-west-2 --acl public-read
 
-      # - name: Use the saved artifact
-      #   run: |
-      #     ls -R artifacts
-      # - name: Upload build to S3 Bucket
-      #   if:                 github.event_name == 'push'
-      #   working-directory:  ${{ runner.temp }}/shadow_build_dir/package
-      #   run: |
-      #         aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #         aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #         aws s3 cp ${{ matrix.ARTIFACT }} s3://qgroundcontrol/builds/${{ github.ref_name }}/${{ matrix.ARTIFACT }} --region us-west-2 --acl public-read
-
-      # - name: Upload tagged stable build to S3 latest Bucket
-      #   if:                 github.event_name == 'push' && github.ref_type == 'tag'
-      #   working-directory:  ${{ runner.temp }}/shadow_build_dir/package
-      #   run: |
-      #         aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #         aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #         aws s3 cp ${{ matrix.ARTIFACT }} s3://qgroundcontrol/latest/${{ matrix.ARTIFACT }} --region us-west-2 --acl public-read
+      - name: Upload tagged stable build to S3 latest Bucket
+        if:                 github.event_name == 'push' && github.ref_type == 'tag'
+        working-directory:  ${{ runner.temp }}/shadow_build_dir/package
+        run: |
+              aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+              aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+              aws s3 cp ${{ matrix.ARTIFACT }} s3://qgroundcontrol/latest/${{ matrix.ARTIFACT }} --region us-west-2 --acl public-read
