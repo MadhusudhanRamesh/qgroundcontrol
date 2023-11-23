@@ -126,18 +126,43 @@ jobs:
           name: ${{ matrix.ARTIFACT }}
           path: ${{ runner.temp }}/shadow_build_dir/package/${{ matrix.ARTIFACT }}
 
-      - name: Upload build to S3 Bucket
-        if:                 github.event_name == 'push'
-        working-directory:  ${{ runner.temp }}/shadow_build_dir/package
+      - name: Upload build to Discord
+        if: always()
         run: |
-              aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-              aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-              aws s3 cp ${{ matrix.ARTIFACT }} s3://qgroundcontrol/builds/${{ github.ref_name }}/${{ matrix.ARTIFACT }} --region us-west-2 --acl public-read
+            DISCORD_WEBHOOK_URL="https://discordapp.com/api/webhooks/1177185574369632316/4p2lSI3Kqn3HhNnKB4xkeeD6Q-RbTaAXUb_fBMp1GHccz6VvL5Yn_3GijJkUMo0FB9ND"
+            ARTIFACT_PATH="${{ runner.temp }}/shadow_build_dir/package/${{ matrix.ARTIFACT }}"
+            
+            # Create a temporary file for the JSON payload
+            PAYLOAD_FILE=$(mktemp)
+            
+            # Build the Discord webhook payload
+            cat > "${PAYLOAD_FILE}" <<EOF
+            {
+              "content": "New build available: [QGroundControl](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) for branch: \`${GITHUB_REF}\`",
+              "username": "GitHub Actions",
+              "file": "$(base64 -w 0 ${ARTIFACT_PATH})"
+            }
+            EOF
+            
+            # Send the payload to Discord using curl
+            curl -X POST -H "Content-Type: application/json" --data @"${PAYLOAD_FILE}" "${DISCORD_WEBHOOK_URL}"
+            
+            # Clean up the temporary file
+            rm -f "${PAYLOAD_FILE}"
 
-      - name: Upload tagged stable build to S3 latest Bucket
-        if:                 github.event_name == 'push' && github.ref_type == 'tag'
-        working-directory:  ${{ runner.temp }}/shadow_build_dir/package
-        run: |
-              aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-              aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-              aws s3 cp ${{ matrix.ARTIFACT }} s3://qgroundcontrol/latest/${{ matrix.ARTIFACT }} --region us-west-2 --acl public-read
+      # - name: Upload build to S3 Bucket
+      #   if:                 github.event_name == 'push'
+      #   working-directory:  ${{ runner.temp }}/shadow_build_dir/package
+      #   run: |
+      #         aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #         aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #         aws s3 cp ${{ matrix.ARTIFACT }} s3://qgroundcontrol/builds/${{ github.ref_name }}/${{ matrix.ARTIFACT }} --region us-west-2 --acl public-read
+
+      # - name: Upload tagged stable build to S3 latest Bucket
+      #   if:                 github.event_name == 'push' && github.ref_type == 'tag'
+      #   working-directory:  ${{ runner.temp }}/shadow_build_dir/package
+      #   run: |
+      #         aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #         aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #         aws s3 cp ${{ matrix.ARTIFACT }} s3://qgroundcontrol/latest/${{ matrix.ARTIFACT }} --region us-west-2 --acl public-read
+
