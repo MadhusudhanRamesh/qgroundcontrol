@@ -131,9 +131,9 @@ jobs:
 
       # (Any other steps you need)
 
-      - name: Use the saved artifact
-        run: |
-          ls -R artifacts
+      # - name: Use the saved artifact
+      #   run: |
+      #     ls -R artifacts
       # - name: Upload build to S3 Bucket
       #   if:                 github.event_name == 'push'
       #   working-directory:  ${{ runner.temp }}/shadow_build_dir/package
